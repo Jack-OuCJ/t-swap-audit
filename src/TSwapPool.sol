@@ -42,6 +42,7 @@ contract TSwapPool is ERC20 {
     //////////////////////////////////////////////////////////////*/
     IERC20 private immutable i_wethToken;
     IERC20 private immutable i_poolToken;
+    // written Large Numeric Literal
     uint256 private constant MINIMUM_WETH_LIQUIDITY = 1_000_000_000;
     uint256 private swap_count = 0;
     uint256 private constant SWAP_COUNT_MAX = 10;
@@ -93,6 +94,7 @@ contract TSwapPool is ERC20 {
         string memory liquidityTokenName,
         string memory liquidityTokenSymbol
     ) ERC20(liquidityTokenName, liquidityTokenSymbol) {
+        // written lacks a zero-check
         i_wethToken = IERC20(wethToken);
         i_poolToken = IERC20(poolToken);
     }
@@ -114,6 +116,8 @@ contract TSwapPool is ERC20 {
         uint256 wethToDeposit,
         uint256 minimumLiquidityTokensToMint,
         uint256 maximumPoolTokensToDeposit,
+        // written high!! deadline not used
+        // if someone expects a fail, will go through servere disruption of functionality
         uint64 deadline
     )
         external
@@ -121,6 +125,8 @@ contract TSwapPool is ERC20 {
         returns (uint256 liquidityTokensToMint)
     {
         if (wethToDeposit < MINIMUM_WETH_LIQUIDITY) {
+            // written there is no need to emit message if 
+            // MINIMUM_WETH_LIQUIDITY is a constant
             revert TSwapPool__WethDepositAmountTooLow(
                 MINIMUM_WETH_LIQUIDITY,
                 wethToDeposit
@@ -128,6 +134,7 @@ contract TSwapPool is ERC20 {
         }
         if (totalLiquidityTokenSupply() > 0) {
             uint256 wethReserves = i_wethToken.balanceOf(address(this));
+            // written don't need this line
             uint256 poolTokenReserves = i_poolToken.balanceOf(address(this));
             // Our invariant says weth, poolTokens, and liquidity tokens must always have the same ratio after the
             // initial deposit
@@ -179,6 +186,8 @@ contract TSwapPool is ERC20 {
                 maximumPoolTokensToDeposit,
                 wethToDeposit
             );
+            // e not a state variable
+            // every time you see external call and then update state variable
             liquidityTokensToMint = wethToDeposit;
         }
     }
@@ -193,6 +202,8 @@ contract TSwapPool is ERC20 {
         uint256 liquidityTokensToMint
     ) private {
         _mint(msg.sender, liquidityTokensToMint);
+        // written this is a backwards, giving wrong message
+        // it should be LiquidityAdded(msg.sender, wethToDeposit, poolTokensToDeposit)
         emit LiquidityAdded(msg.sender, poolTokensToDeposit, wethToDeposit);
 
         // Interactions
@@ -273,8 +284,10 @@ contract TSwapPool is ERC20 {
         // totalPoolTokensOfPool) + (wethToDeposit * poolTokensToDeposit) = k
         // (totalWethOfPool * totalPoolTokensOfPool) + (wethToDeposit * totalPoolTokensOfPool) = k - (totalWethOfPool *
         // poolTokensToDeposit) - (wethToDeposit * poolTokensToDeposit)
+        // written Literal Instead of Constant
         uint256 inputAmountMinusFee = inputAmount * 997;
         uint256 numerator = inputAmountMinusFee * outputReserves;
+        // written Literal Instead of Constant
         uint256 denominator = (inputReserves * 1000) + inputAmountMinusFee;
         return numerator / denominator;
     }
@@ -290,11 +303,14 @@ contract TSwapPool is ERC20 {
         revertIfZero(outputReserves)
         returns (uint256 inputAmount)
     {
+        // written users are charged so much
+        // written Literal Instead of Constant
         return
             ((inputReserves * outputAmount) * 10000) /
             ((outputReserves - outputAmount) * 997);
     }
 
+    // written Public Function Not Used Internally and where is the natspec
     function swapExactInput(
         IERC20 inputToken,
         uint256 inputAmount,
@@ -305,6 +321,9 @@ contract TSwapPool is ERC20 {
         public
         revertIfZero(inputAmount)
         revertIfDeadlinePassed(deadline)
+        // written the return value is not used
+        // IMPACT: protocol is giving the wrong return 
+        // LIKELYHOOD: high
         returns (uint256 output)
     {
         uint256 inputReserves = inputToken.balanceOf(address(this));
@@ -333,6 +352,7 @@ contract TSwapPool is ERC20 {
      * @param inputToken ERC20 token to pull from caller
      * @param outputToken ERC20 token to send to caller
      * @param outputAmount The exact amount of tokens to send to caller
+     * @audit-info missing deadline param in natspec
      */
     function swapExactOutput(
         IERC20 inputToken,
@@ -354,6 +374,8 @@ contract TSwapPool is ERC20 {
             outputReserves
         );
 
+        // @audit no slippage protection
+
         _swap(inputToken, inputAmount, outputToken, outputAmount);
     }
 
@@ -365,6 +387,7 @@ contract TSwapPool is ERC20 {
     function sellPoolTokens(
         uint256 poolTokenAmount
     ) external returns (uint256 wethAmount) {
+        // written wrong function here, but the function sellPoolTokens is not used
         return
             swapExactOutput(
                 i_poolToken,
@@ -397,8 +420,10 @@ contract TSwapPool is ERC20 {
         }
 
         swap_count++;
+        // written high: breaks protocol invariant !!!
         if (swap_count >= SWAP_COUNT_MAX) {
             swap_count = 0;
+            // written Large Numeric Literal
             outputToken.safeTransfer(msg.sender, 1_000_000_000_000_000_000);
         }
         emit Swap(
@@ -432,6 +457,7 @@ contract TSwapPool is ERC20 {
     }
 
     /// @notice a more verbose way of getting the total supply of liquidity tokens
+    // written should be external
     function totalLiquidityTokenSupply() public view returns (uint256) {
         return totalSupply();
     }
@@ -451,6 +477,7 @@ contract TSwapPool is ERC20 {
     function getPriceOfOneWethInPoolTokens() external view returns (uint256) {
         return
             getOutputAmountBasedOnInput(
+                // written Literal Instead of Constant
                 1e18,
                 i_wethToken.balanceOf(address(this)),
                 i_poolToken.balanceOf(address(this))
@@ -460,6 +487,7 @@ contract TSwapPool is ERC20 {
     function getPriceOfOnePoolTokenInWeth() external view returns (uint256) {
         return
             getOutputAmountBasedOnInput(
+                // written Literal Instead of Constant
                 1e18,
                 i_poolToken.balanceOf(address(this)),
                 i_wethToken.balanceOf(address(this))
